@@ -40,19 +40,20 @@ InvoiceMonth | Peeples Valley, AZ | Medicine Lodge, KS | Gasport, NY | Sylvanite
 */
 
 ;WITH PivotData AS 
-(SELECT month(Inv.InvoiceDate) AS MNTH, year(Inv.InvoiceDate) AS YR, Customs.CustomerName AS CustomerName--, --count(Customs.CustomerName) AS Cn
-	--COUNT(CustomerName) OVER (PARTITION BY Inv.InvoiceDate) AS cnt
+(
+SELECT 
+	CONVERT(VARCHAR(30), dateadd("DAY", -(day(EOMONTH(Inv.InvoiceDate))-1), EOMONTH(Inv.InvoiceDate)), 104) AS firstdd, 
+	substring(substring(Customs.CustomerName, 0, charindex(')', Customs.CustomerName)),16,20)  AS CustomerName
 FROM Sales.Invoices AS Inv
 JOIN Sales.Customers AS Customs ON Inv.CustomerID = Customs.CustomerID
 WHERE Customs.CustomerID BETWEEN 2 AND 6
---GROUP BY Customs.CustomerName, year(Inv.InvoiceDate), month(Inv.InvoiceDate)
---ORDER BY Customs.CustomerName, year(Inv.InvoiceDate), month(Inv.InvoiceDate)
 )
 SELECT *
 FROM PivotData
-PIVOT ( count(CustomerName) FOR CustomerName
-	IN ([Gasport, NY], [Jessie, ND], [Medicine Lodge, KS], [Peeples Valley, AZ], [Sylvanite, MT])
-) AS PivotTable;
+PIVOT ( count(CustomerName) 
+	FOR CustomerName IN ([Gasport, NY], [Jessie, ND], [Medicine Lodge, KS], [Peeples Valley, AZ], [Sylvanite, MT])
+) AS PivotTable
+ORDER BY PivotTable.firstdd
 
 /*
 2. Для всех клиентов с именем, в котором есть "Tailspin Toys"
@@ -96,10 +97,11 @@ CountryId | CountryName | Code
 
 SELECT *
 FROM (
-	SELECT CountryID, CountryName, IsoAlpha3Code, cast(IsoNumericCode AS VARCHAR) AS IsoNum
+	SELECT CountryName, IsoAlpha3Code, cast(IsoNumericCode AS nvarchar(3)) AS IsoNumericCode
 	FROM Application.Countries
 	) AS cntr
-UNPIVOT (Code FOR colCode IN (IsoAlpha3Code, IsoNum)) AS unpt;
+UNPIVOT (Code FOR colCode IN (IsoAlpha3Code, IsoNumericCode)) AS unpt;
+
 
 /*
 4. Выберите по каждому клиенту два самых дорогих товара, которые он покупал.
@@ -112,6 +114,7 @@ CROSS APPLY (
 	SELECT TOP 2 ord.CustomerID, max(ordLine.UnitPrice) AS MX
 	FROM Sales.OrderLines AS ordLine
 	JOIN Sales.Orders AS ord ON ordLine.OrderID = ord.OrderID
+	WHERE C.CustomerID = ord.CustomerID
 	GROUP BY ord.CustomerID
 	) AS Tbl
 --ORDER BY C.CustomerName;
