@@ -72,3 +72,63 @@ PIVOT ( count(CustomerName)
 ORDER BY PivotTable.firstdd'
 
 EXEC sp_executesql @dml
+
+
+---2-ой вариант с параметрами @CustomerIDFrom, @CustomerIDTo
+--сделала через Хранимую процедуру
+CREATE OR ALTER PROCEDURE [dbo].[DynamicSql]
+     @CustomerIDFrom    int,     
+	 @CustomerIDTo      int
+AS
+BEGIN
+  SET NOCOUNT ON;
+  
+DECLARE @dml AS NVARCHAR(MAX)
+DECLARE @ColumnName AS NVARCHAR(MAX)
+DECLARE @params nvarchar(max)
+
+ SET @params = N'
+     @CustomerIDFrom    int,     
+	 @CustomerIDTo      int';
+
+SELECT @ColumnName= ISNULL(@ColumnName + ',','') + QUOTENAME(names.CustomerName)
+FROM
+	(
+	select distinct substring(substring(CustomerName, 0, charindex(')', CustomerName)),16,20)  AS CustomerName
+	from Sales.Customers
+	WHERE CustomerID BETWEEN  @CustomerIDFrom  AND  @CustomerIDTo 
+	) AS names
+
+
+SELECT @ColumnName as ColumnName
+
+SET @dml =  
+N';WITH PivotData AS 
+(
+SELECT 
+	CONVERT(VARCHAR(30), dateadd("DAY", -(day(EOMONTH(Inv.InvoiceDate))-1), EOMONTH(Inv.InvoiceDate)), 104) AS firstdd,
+	substring(substring(Customs.CustomerName, 0, charindex('')'', Customs.CustomerName)),16,20)  AS CustomerName
+	FROM Sales.Invoices AS Inv
+JOIN Sales.Customers AS Customs ON Inv.CustomerID = Customs.CustomerID
+WHERE Customs.CustomerID BETWEEN 2 AND 6
+)
+SELECT *
+FROM PivotData
+PIVOT ( count(CustomerName) 
+	FOR CustomerName IN (' + @ColumnName + ')) AS PivotTable
+ORDER BY PivotTable.firstdd'
+
+EXEC sp_executesql @dml, @params, 
+       @CustomerIDFrom,
+       @CustomerIDTo;
+
+END
+
+
+
+exec [dbo].[DynamicSql]
+  @CustomerIDFrom = 2,
+  @CustomerIDTo = 6          
+
+
+
