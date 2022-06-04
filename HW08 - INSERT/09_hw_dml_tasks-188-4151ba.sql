@@ -57,10 +57,9 @@ INSERT INTO Sales.Customers
 	[PostalAddressLine1],
 	[PostalAddressLine2],
 	[PostalPostalCode],
-	[LastEditedBy],
-	[CustomerCategoryName])
+	[LastEditedBy])
 SELECT TOP 5  
-	'TEST',
+	'TEST ' +  cast(newid() as nchar(36)),
 	[BillToCustomerID],
 	[CustomerCategoryID],
 	[BuyingGroupID],
@@ -87,33 +86,128 @@ SELECT TOP 5
 	[PostalAddressLine1],
 	[PostalAddressLine2],
 	[PostalPostalCode],
-	[LastEditedBy],
-	[CustomerCategoryName]
+	[LastEditedBy]
 FROM Sales.Customers;
 
 
---Select top 1 * from Purchasing.Suppliers
 /*
 2. Удалите одну запись из Customers, которая была вами добавлена
 */
 
-напишите здесь свое решение
+DELETE TOP (1) FROM	 Sales.Customers
+WHERECustomerName like '%TEST%';
 
 
 /*
 3. Изменить одну запись, из добавленных через UPDATE
 */
 
-напишите здесь свое решение
+UPDATE TOP (1)	 Sales.Customers
+SET CustomerName = 'Test_Flowers'
+WHERE CustomerName like '%TEST%';
 
 /*
 4. Написать MERGE, который вставит вставит запись в клиенты, если ее там нет, и изменит если она уже есть
 */
 
-напишите здесь свое решение
+MERGE Sales.Customers AS target 
+USING (SELECT top 10 * from Sales.Customers
+		WHERE CustomerName like '%TEST%'
+		) 
+		AS source  
+		ON
+	 (target.CustomerID = source.CustomerID) 
+	WHEN MATCHED 
+		THEN UPDATE SET target.CreditLimit = 0
+	WHEN NOT MATCHED 
+		THEN INSERT ([CustomerID], [CustomerName], [BillToCustomerID], [CustomerCategoryID], [BuyingGroupID], [PrimaryContactPersonID], [AlternateContactPersonID],[DeliveryMethodID],[DeliveryCityID], [PostalCityID], [CreditLimit], [AccountOpenedDate]) 
+		VALUES (source.[CustomerID], source.[CustomerName], source.[BillToCustomerID], source.[CustomerCategoryID], source.[BuyingGroupID], source.[PrimaryContactPersonID], source.[AlternateContactPersonID], source.[DeliveryMethodID], source.[DeliveryCityID], source.[PostalCityID], source.[CreditLimit], source.[AccountOpenedDate]) 
+	OUTPUT deleted.*, $action, inserted.*;
 
 /*
 5. Напишите запрос, который выгрузит данные через bcp out и загрузить через bulk insert
 */
 
-напишите здесь свое решение
+-- To allow advanced options to be changed.  
+EXEC sp_configure 'show advanced options', 1;  
+GO  
+-- To update the currently configured value for advanced options.  
+RECONFIGURE;  
+GO  
+-- To enable the feature.  
+EXEC sp_configure 'xp_cmdshell', 1;  
+GO  
+-- To update the currently configured value for this feature.  
+RECONFIGURE;  
+GO  
+
+SELECT @@SERVERNAME
+
+exec master..xp_cmdshell 'bcp "[WideWorldImporters].Sales.Customers" out  "D:\1\Customers.txt" -T -w -t"!!!" -S DESKTOP-83GPC9J\SQL2017'
+-----------
+drop table if exists [Sales].[Customers_BulkDemo]
+
+
+CREATE TABLE [Sales].[Customers_BulkDemo](
+	[CustomerID] [int] NOT NULL,
+	[CustomerName] [nvarchar](100) NOT NULL,
+	[BillToCustomerID] [int] NOT NULL,
+	[CustomerCategoryID] [int] NOT NULL,
+	[BuyingGroupID] [int] NULL,
+	[PrimaryContactPersonID] [int] NOT NULL,
+	[AlternateContactPersonID] [int] NULL,
+	[DeliveryMethodID] [int] NOT NULL,
+	[DeliveryCityID] [int] NOT NULL,
+	[PostalCityID] [int] NOT NULL,
+	[CreditLimit] [decimal](18, 2) NULL,
+	[AccountOpenedDate] [date] NOT NULL,
+	[StandardDiscountPercentage] [decimal](18, 3) NOT NULL,
+	[IsStatementSent] [bit] NOT NULL,
+	[IsOnCreditHold] [bit] NOT NULL,
+	[PaymentDays] [int] NOT NULL,
+	[PhoneNumber] [nvarchar](20) NOT NULL,
+	[FaxNumber] [nvarchar](20) NOT NULL,
+	[DeliveryRun] [nvarchar](5) NULL,
+	[RunPosition] [nvarchar](5) NULL,
+	[WebsiteURL] [nvarchar](256) NOT NULL,
+	[DeliveryAddressLine1] [nvarchar](60) NOT NULL,
+	[DeliveryAddressLine2] [nvarchar](60) NULL,
+	[DeliveryPostalCode] [nvarchar](10) NOT NULL,
+	[DeliveryLocation] [geography] NULL,
+	[PostalAddressLine1] [nvarchar](60) NOT NULL,
+	[PostalAddressLine2] [nvarchar](60) NULL,
+	[PostalPostalCode] [nvarchar](10) NOT NULL,
+	[LastEditedBy] [int] NOT NULL,
+	[ValidFrom] [datetime2](7) GENERATED ALWAYS AS ROW START NOT NULL,
+	[ValidTo] [datetime2](7) GENERATED ALWAYS AS ROW END NOT NULL,
+ CONSTRAINT [PK_Sales_Customers_BulkDemo] PRIMARY KEY CLUSTERED 
+(
+	[CustomerID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [USERDATA],
+ CONSTRAINT [UQ_Sales_Customers_CustomerName_BulkDemo] UNIQUE NONCLUSTERED 
+(
+	[CustomerName] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [USERDATA],
+	PERIOD FOR SYSTEM_TIME ([ValidFrom], [ValidTo])
+) ON [USERDATA] TEXTIMAGE_ON [USERDATA]
+
+GO
+
+	BULK INSERT [WideWorldImporters].[Sales].[Customers_BulkDemo]
+				   FROM "D:\1\Customers.txt"
+				   WITH 
+					 (
+						BATCHSIZE = 1000, 
+						DATAFILETYPE = 'widechar',
+						FIELDTERMINATOR = '!!!',
+						ROWTERMINATOR ='\n',
+						KEEPNULLS,
+						TABLOCK        
+					  );
+
+
+select Count(*) from [Sales].[Customers_BulkDemo];
+select Count(*) from [Sales].[Customers];
+
+TRUNCATE TABLE [Sales].[Customers_BulkDemo];
+drop table if exists [Sales].[Customers_BulkDemo]
