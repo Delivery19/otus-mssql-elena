@@ -45,6 +45,8 @@ UnitPrice
 
 
 --С помощью OPENXML
+
+
 DECLARE @xmlDocument  xml
 
 -- Считываем XML-файл в переменную
@@ -92,27 +94,119 @@ WITH (
 
 -- Надо удалить handle
 EXEC sp_xml_removedocument @docHandle
-
 SELECT * FROM #StockItem
 
+--SELECT wS.* FROM Warehouse.StockItems wS
+--LEFT JOIN #StockItem SI ON wS.StockItemName COLLATE Latin1_General_CI_AS = SI.StockItemName
 
-SELECT wS.* FROM Warehouse.StockItems wS
-LEFT JOIN #StockItem SI ON wS.StockItemName = SI.StockItemName
-
-
-
-
-
-
+MERGE Warehouse.StockItems AS target 
+USING (SELECT *  FROM #StockItem 
+		) 
+		AS source  
+		ON
+	 (target.StockItemName = source.StockItemName COLLATE Latin1_General_100_CI_AS) 
+	WHEN MATCHED 
+		THEN UPDATE SET target.SupplierID = source.SupplierID,
+						target.UnitPackageID = source.UnitPackageID,
+						target.OuterPackageID = source.OuterPackageID,
+						target.QuantityPerOuter = source.QuantityPerOuter,
+						target.TypicalWeightPerUnit = source.TypicalWeightPerUnit,
+						target.LeadTimeDays = source.LeadTimeDays,
+						target.IsChillerStock = source.IsChillerStock,
+						target.TaxRate = source.TaxRate,
+						target.UnitPrice = source.UnitPrice
+	WHEN NOT MATCHED 
+		THEN INSERT (StockItemName, SupplierID, UnitPackageID, OuterPackageID, QuantityPerOuter, TypicalWeightPerUnit, LeadTimeDays, IsChillerStock, TaxRate, UnitPrice, [LastEditedBy]) 
+		VALUES (source.StockItemName, source.SupplierID, source.UnitPackageID, source.OuterPackageID, source.QuantityPerOuter, source.TypicalWeightPerUnit, source.LeadTimeDays, source.IsChillerStock, source.TaxRate, source.UnitPrice, 1) 
+	OUTPUT deleted.*, $action, inserted.*;
 
 
 DROP TABLE IF EXISTS #StockItem
+
+
+--через XQuery
+
+
+DECLARE @x XML
+SET @x = ( 
+  SELECT * FROM OPENROWSET
+  (BULK 'D:\otus\11_StockItems-188-1fb5df.xml',
+   SINGLE_CLOB) as d)
+
+-- можно вставить результат в таблицу
+DROP TABLE IF EXISTS #StockItem
+
+CREATE TABLE #StockItem(
+	[StockItemName]        nvarchar(100)  ,
+	[SupplierID]           int            ,
+	[UnitPackageID]        int            ,
+	[OuterPackageID]       int            ,
+	[QuantityPerOuter]     int            ,
+	[TypicalWeightPerUnit] decimal(18,3)  ,
+	[LeadTimeDays]         int            ,
+	[IsChillerStock]       bit            ,
+	[TaxRate]              decimal(18,3)  ,
+	[UnitPrice]            decimal(18,2) 
+)
+
+INSERT INTO #StockItem
+SELECT 
+   @x.value('(/StockItems/Item/@Name)[1]', 'nvarchar(100)') as [StockItemName],
+   @x.value('(/StockItems/Item/SupplierID)[1]', 'int') as [SupplierID],
+   @x.value('(/StockItems/Item/Package/UnitPackageID)[1]', 'int') as [UnitPackageID],
+   @x.value('(/StockItems/Item/Package/OuterPackageID)[1]', 'int') as [OuterPackageID],
+   @x.value('(/StockItems/Item/Package/QuantityPerOuter)[1]', 'int') as [QuantityPerOuter],
+   @x.value('(/StockItems/Item/Package/TypicalWeightPerUnit)[1]', 'decimal(18,3)') as [TypicalWeightPerUnit],
+   @x.value('(/StockItems/Item/LeadTimeDays)[1]', 'int') as [LeadTimeDays],
+   @x.value('(/StockItems/Item/IsChillerStock)[1]', 'bit') as [IsChillerStock],
+   @x.value('(/StockItems/Item/TaxRate)[1]', 'decimal(18,3)') as [TaxRate],
+   @x.value('(/StockItems/Item/UnitPrice)[1]', 'decimal(18,2)') as [UnitPrice]
+
+ 
+MERGE Warehouse.StockItems AS target 
+USING (SELECT *  FROM #StockItem 
+		) 
+		AS source  
+		ON
+	 (target.StockItemName = source.StockItemName COLLATE Latin1_General_100_CI_AS) 
+	WHEN MATCHED 
+		THEN UPDATE SET target.SupplierID = source.SupplierID,
+						target.UnitPackageID = source.UnitPackageID,
+						target.OuterPackageID = source.OuterPackageID,
+						target.QuantityPerOuter = source.QuantityPerOuter,
+						target.TypicalWeightPerUnit = source.TypicalWeightPerUnit,
+						target.LeadTimeDays = source.LeadTimeDays,
+						target.IsChillerStock = source.IsChillerStock,
+						target.TaxRate = source.TaxRate,
+						target.UnitPrice = source.UnitPrice
+	WHEN NOT MATCHED 
+		THEN INSERT (StockItemName, SupplierID, UnitPackageID, OuterPackageID, QuantityPerOuter, TypicalWeightPerUnit, LeadTimeDays, IsChillerStock, TaxRate, UnitPrice, [LastEditedBy]) 
+		VALUES (source.StockItemName, source.SupplierID, source.UnitPackageID, source.OuterPackageID, source.QuantityPerOuter, source.TypicalWeightPerUnit, source.LeadTimeDays, source.IsChillerStock, source.TaxRate, source.UnitPrice, 1) 
+	OUTPUT deleted.*, $action, inserted.*;
+
+
+DROP TABLE IF EXISTS #StockItem
+
 
 /*
 2. Выгрузить данные из таблицы StockItems в такой же xml-файл, как StockItems.xml
 */
 
-напишите здесь свое решение
+SELECT
+    StockItemName AS [@Name],
+    SupplierID AS [SupplierID],
+    UnitPackageID AS [Package/UnitPackageID],
+    OuterPackageID AS [Package/OuterPackageID],
+    QuantityPerOuter AS [Package/QuantityPerOuter],
+    TypicalWeightPerUnit AS [Package/TypicalWeightPerUnit],
+    LeadTimeDays [LeadTimeDays],
+    IsChillerStock AS [IsChillerStock],
+	TaxRate AS [TaxRate],
+	UnitPrice AS [UnitPrice]
+FROM Warehouse.StockItems
+WHERE Warehouse.StockItems.TaxRate = 20
+FOR XML PATH('Item'), ROOT('StockItems')
+GO
 
 
 /*
@@ -124,7 +218,10 @@ DROP TABLE IF EXISTS #StockItem
 - FirstTag (из поля CustomFields, первое значение из массива Tags)
 */
 
-напишите здесь свое решение
+SELECT StockItemID, StockItemName,
+	JSON_VALUE(CustomFields, '$.CountryOfManufacture') as CountryOfManufacture,
+	JSON_VALUE(CustomFields, '$.Tags[0]') as FirstTag
+FROM Warehouse.StockItems
 
 /*
 4. Найти в StockItems строки, где есть тэг "Vintage".
@@ -146,4 +243,10 @@ DROP TABLE IF EXISTS #StockItem
 */
 
 
-напишите здесь свое решение
+SELECT StockItemID, StockItemName--,
+--CustomFields,
+--JSON_VALUE(CustomFields, '$.CountryOfManufacture') as CountryOfManufacture,
+--JSON_QUERY(CustomFields, '$.Tags') as Tag
+FROM Warehouse.StockItems
+CROSS APPLY OPENJSON(CustomFields, '$.Tags') tag
+WHERE tag.value = 'Vintage'
