@@ -5,8 +5,8 @@
 Страхование осуществляется на основе существующего вида услуг.
 
 База данных приведена к 3 нормальной форме (находится во 2 нормальной форме и каждый неключевой атрибут не зависит от другого неключевого атрибута)
-Основные таблицы - Operator, Clients, Contract.
-Поле PaspInfoID таблицы PaspInfo является внешним ключом Поля PaspInfoID таблицы Clients
-Поле ClientID таблицы Contract является внешним ключом Поля ClientID таблицы Clients
+Основные таблицы - Operator, Client, Contract.
+Поле PaspInfoID таблицы PaspInfo имеет связь один к одному с полем ClientID таблицы Client
+Поле ClientID таблицы Contract является внешним ключом Поля ClientID таблицы Client
 Поле typeID таблицы Contract является внешним ключом Поля typeID таблицы ContractType
 Поле OperatorID таблицы Contract является внешним ключом Поля OperatorID таблицы Operator
