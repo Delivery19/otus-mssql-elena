@@ -85,33 +85,14 @@ SELECT * FROM Сustomer_summ2 (2);
 4) Создайте табличную функцию покажите как ее можно вызвать для каждой строки result set'а без использования цикла. 
 */
 
-CREATE PROCEDURE Сustomer_summ3
-	@customerid int
-   , @CityCursor CURSOR VARYING OUTPUT -- VARYING курсор как выходная переменная
-AS  
-    SET NOCOUNT ON;  
-    SET @CityCursor = CURSOR  
-    FORWARD_ONLY STATIC FOR  
-      SELECT Customers.CustomerName, InvoiceLines.TaxAmount
-		FROM Sales.Invoices AS Invoices
-		JOIN Sales.InvoiceLines AS InvoiceLines ON Invoices.InvoiceID = InvoiceLines.InvoiceID
-		JOIN Sales.Customers AS Customers ON Invoices.CustomerID = Customers.CustomerID
-		WHERE Customers.CustomerID = @customerid; 
-    OPEN @CityCursor;  
-GO  
+	SELECT Customers.CustomerName
+	FROM  Sales.Customers AS Customers
+	CROSS APPLY Сustomer_summ2(Customers.CustomerID)
+	--OUTER APPLY Сustomer_summ2(2)
 
 
-USE WideWorldImporters;     
-GO  
-DECLARE @MyCursor CURSOR;  
-EXEC Сustomer_summ3 @customerid = 2, @CityCursor = @MyCursor OUTPUT;  
-WHILE (@@FETCH_STATUS = 0)  
-BEGIN;  
-     FETCH NEXT FROM @MyCursor;  
-END;  
-CLOSE @MyCursor;  
-DEALLOCATE @MyCursor;  
-GO
+
+
 
 /*
 5) Опционально. Во всех процедурах укажите какой уровень изоляции транзакций вы бы использовали и почему. 
